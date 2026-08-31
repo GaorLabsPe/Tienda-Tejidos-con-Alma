@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StoreSettings, Product, CategoryItem } from '../types';
+import { supabase } from '../lib/supabase';
 import { 
   Save, 
   X, 
@@ -33,7 +34,8 @@ import {
   Facebook,
   Video,
   KeyRound,
-  Share2
+  Share2,
+  Loader2
 } from 'lucide-react';
 
 const PRESET_BADGES = ['Más Vendido ⭐', 'Novedad ✨', 'Oferta 🔥', 'Exclusivo 💜', 'Popular 🌻', 'Personalizable 🎀'];
@@ -108,6 +110,9 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const [categoryToDelete, setCategoryToDelete] = useState<CategoryItem | null>(null);
   const [isResetCategoriesConfirmOpen, setIsResetCategoriesConfirmOpen] = useState(false);
 
+  const [isUploadingProductImg, setIsUploadingProductImg] = useState(false);
+  const [isUploadingCategoryImg, setIsUploadingCategoryImg] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const categoryFileInputRef = useRef<HTMLInputElement | null>(null);
   const [showSettingsPin, setShowSettingsPin] = useState(false);
@@ -180,19 +185,75 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     setIsEditingProduct(true);
   };
 
-  // Handle Photo File Upload (Convert to Base64)
-  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Photo File Upload (Direct to Supabase Storage Bucket TEJIDOS)
+  const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setEditingProduct(prev => ({ ...prev, image: reader.result as string }));
-        showNotification('Foto cargada exitosamente 📸');
+    try {
+      setIsUploadingProductImg(true);
+
+      // Si Supabase está disponible, subir al bucket TEJIDOS directamente
+      if (supabase) {
+        const fileExt = file.name.split('.').pop() || 'jpg';
+        const cleanFileName = `prod_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `productos/${cleanFileName}`;
+
+        const bucketNames = ['TEJIDOS', 'tejidos'];
+        let publicUrl = '';
+        let uploadSuccess = false;
+
+        for (const bName of bucketNames) {
+          const { error: uploadError } = await supabase.storage
+            .from(bName)
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: true,
+              contentType: file.type || 'image/jpeg'
+            });
+
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage.from(bName).getPublicUrl(filePath);
+            if (urlData?.publicUrl) {
+              publicUrl = urlData.publicUrl;
+              uploadSuccess = true;
+              break;
+            }
+          }
+        }
+
+        if (uploadSuccess && publicUrl) {
+          setEditingProduct(prev => ({ ...prev, image: publicUrl }));
+          showNotification('¡Foto subida y guardada en Supabase! 📸✨');
+          return;
+        }
       }
-    };
-    reader.readAsDataURL(file);
+
+      // Si no hay Supabase o falló, usar Base64 transparente
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setEditingProduct(prev => ({ ...prev, image: reader.result as string }));
+          showNotification('Foto cargada exitosamente 📸');
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Error al subir archivo:', err);
+      // Fallback a base64
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setEditingProduct(prev => ({ ...prev, image: reader.result as string }));
+          showNotification('Foto cargada en vista previa 📸');
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingProductImg(false);
+      // Reset input value to allow re-uploading same file if desired
+      if (e.target) e.target.value = '';
+    }
   };
 
   // Save Product (Create or Update)
@@ -270,18 +331,70 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     setIsEditingCategory(true);
   };
 
-  const handleCategoryImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCategoryImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setEditingCategory(prev => ({ ...prev, image: reader.result as string }));
-        showNotification('Foto de categoría cargada exitosamente 📸');
+    try {
+      setIsUploadingCategoryImg(true);
+
+      if (supabase) {
+        const fileExt = file.name.split('.').pop() || 'jpg';
+        const cleanFileName = `cat_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `categorias/${cleanFileName}`;
+
+        const bucketNames = ['TEJIDOS', 'tejidos'];
+        let publicUrl = '';
+        let uploadSuccess = false;
+
+        for (const bName of bucketNames) {
+          const { error: uploadError } = await supabase.storage
+            .from(bName)
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: true,
+              contentType: file.type || 'image/jpeg'
+            });
+
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage.from(bName).getPublicUrl(filePath);
+            if (urlData?.publicUrl) {
+              publicUrl = urlData.publicUrl;
+              uploadSuccess = true;
+              break;
+            }
+          }
+        }
+
+        if (uploadSuccess && publicUrl) {
+          setEditingCategory(prev => ({ ...prev, image: publicUrl }));
+          showNotification('¡Foto de categoría subida a Supabase! 📸✨');
+          return;
+        }
       }
-    };
-    reader.readAsDataURL(file);
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setEditingCategory(prev => ({ ...prev, image: reader.result as string }));
+          showNotification('Foto de categoría cargada exitosamente 📸');
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error uploading category image:', err);
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setEditingCategory(prev => ({ ...prev, image: reader.result as string }));
+          showNotification('Foto cargada en vista previa 📸');
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingCategoryImg(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   const handleSaveCategory = (e: React.FormEvent) => {
@@ -1345,11 +1458,21 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     
                     <button
                       type="button"
+                      disabled={isUploadingProductImg}
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-full py-2.5 px-3 bg-[#653977] hover:bg-[#532d63] text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:scale-95 transition-all"
+                      className="w-full py-2.5 px-3 bg-[#653977] hover:bg-[#532d63] disabled:opacity-60 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:scale-95 transition-all"
                     >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Subir Foto del Celular</span>
+                      {isUploadingProductImg ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Subiendo imagen a Supabase...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Subir Foto del Celular / PC</span>
+                        </>
+                      )}
                     </button>
                     
                     <input 
@@ -1722,11 +1845,21 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     
                     <button
                       type="button"
+                      disabled={isUploadingCategoryImg}
                       onClick={() => categoryFileInputRef.current?.click()}
-                      className="w-full py-2.5 px-3 bg-purple-100 hover:bg-purple-200 text-[#653977] font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="w-full py-2.5 px-3 bg-purple-100 hover:bg-purple-200 disabled:opacity-60 text-[#653977] font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Subir Foto desde Celular / Galería</span>
+                      {isUploadingCategoryImg ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Subiendo imagen a Supabase...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Subir Foto desde Celular / Galería</span>
+                        </>
+                      )}
                     </button>
 
                     <div className="space-y-1">
