@@ -14,7 +14,14 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   deliveryCost: 8.00,
   freeDeliveryThreshold: 75.00,
   storeAddress: "Taller Artesanal - Entregas a todo Lima y Perú",
-  openingHours: "Lunes a Domingo: 8:00 AM - 10:00 PM"
+  openingHours: "Lunes a Domingo: 8:00 AM - 10:00 PM",
+  tiktokUrl: "https://www.tiktok.com/@tejidosconalma",
+  showTiktok: true,
+  instagramUrl: "https://www.instagram.com/tejidosconalma",
+  showInstagram: true,
+  facebookUrl: "https://www.facebook.com/tejidosconalma",
+  showFacebook: true,
+  adminPin: "1982"
 };
 
 export const AVAILABLE_WRAPPINGS = [

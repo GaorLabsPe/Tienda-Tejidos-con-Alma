@@ -6,6 +6,7 @@ export interface CategoryItem {
   subtitle?: string; // e.g. 'Eternos & luz'
   image: string; // Image URL for banner/card
   count?: number;
+  isVisible?: boolean;
 }
 
 export interface ProductOption {
@@ -104,4 +105,11 @@ export interface StoreSettings {
   freeDeliveryThreshold: number;
   storeAddress: string;
   openingHours: string;
+  tiktokUrl?: string;
+  showTiktok?: boolean;
+  instagramUrl?: string;
+  showInstagram?: boolean;
+  facebookUrl?: string;
+  showFacebook?: boolean;
+  adminPin?: string;
 }

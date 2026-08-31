@@ -23,7 +23,7 @@ export default function App() {
   const [settings, setSettings] = useState<StoreSettings>(() => {
     try {
       const saved = localStorage.getItem('tejidos_con_alma_v1');
-      return saved ? JSON.parse(saved) : DEFAULT_STORE_SETTINGS;
+      return saved ? { ...DEFAULT_STORE_SETTINGS, ...JSON.parse(saved) } : DEFAULT_STORE_SETTINGS;
     } catch {
       return DEFAULT_STORE_SETTINGS;
     }
@@ -85,6 +85,15 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('tejidos_con_alma_categories', JSON.stringify(categories));
   }, [categories]);
+
+  const toggleCategoryVisibility = (categoryId: string) => {
+    setCategories(prev => prev.map(c => {
+      if (c.id === categoryId) {
+        return { ...c, isVisible: c.isVisible === false ? true : false };
+      }
+      return c;
+    }));
+  };
 
   const handleAddCategory = (newCategory: CategoryItem) => {
     setCategories(prev => [...prev, newCategory]);
@@ -186,6 +195,15 @@ export default function App() {
           plin_number: newSettings.plinNumber,
           delivery_cost: newSettings.deliveryCost,
           free_delivery_threshold: newSettings.freeDeliveryThreshold,
+          store_address: newSettings.storeAddress,
+          opening_hours: newSettings.openingHours,
+          tiktok_url: newSettings.tiktokUrl,
+          show_tiktok: newSettings.showTiktok,
+          instagram_url: newSettings.instagramUrl,
+          show_instagram: newSettings.showInstagram,
+          facebook_url: newSettings.facebookUrl,
+          show_facebook: newSettings.showFacebook,
+          admin_pin: newSettings.adminPin,
         }).eq('id', data.id);
       }
     }
@@ -203,19 +221,27 @@ export default function App() {
           .single();
           
         if (storeSettings && !settingsError) {
-          setSettings({
-            storeName: storeSettings.store_name,
-            whatsappNumber: storeSettings.whatsapp_number,
-            whatsappDisplay: storeSettings.whatsapp_display,
-            currency: storeSettings.currency,
-            currencySymbol: storeSettings.currency_symbol,
-            yapeNumber: storeSettings.yape_number || '',
-            plinNumber: storeSettings.plin_number || '',
-            deliveryCost: storeSettings.delivery_cost,
-            freeDeliveryThreshold: storeSettings.free_delivery_threshold,
-            storeAddress: 'Taller San Miguel (Previa coordinación)',
-            openingHours: 'Lunes a Sábado: 9:00 AM - 6:00 PM',
-          });
+          setSettings(prev => ({
+            ...prev,
+            storeName: storeSettings.store_name || prev.storeName,
+            whatsappNumber: storeSettings.whatsapp_number || prev.whatsappNumber,
+            whatsappDisplay: storeSettings.whatsapp_display || prev.whatsappDisplay,
+            currency: storeSettings.currency || prev.currency,
+            currencySymbol: storeSettings.currency_symbol || prev.currencySymbol,
+            yapeNumber: storeSettings.yape_number || prev.yapeNumber,
+            plinNumber: storeSettings.plin_number || prev.plinNumber,
+            deliveryCost: storeSettings.delivery_cost ?? prev.deliveryCost,
+            freeDeliveryThreshold: storeSettings.free_delivery_threshold ?? prev.freeDeliveryThreshold,
+            storeAddress: storeSettings.store_address || prev.storeAddress,
+            openingHours: storeSettings.opening_hours || prev.openingHours,
+            tiktokUrl: storeSettings.tiktok_url ?? prev.tiktokUrl,
+            showTiktok: storeSettings.show_tiktok ?? prev.showTiktok,
+            instagramUrl: storeSettings.instagram_url ?? prev.instagramUrl,
+            showInstagram: storeSettings.show_instagram ?? prev.showInstagram,
+            facebookUrl: storeSettings.facebook_url ?? prev.facebookUrl,
+            showFacebook: storeSettings.show_facebook ?? prev.showFacebook,
+            adminPin: storeSettings.admin_pin || prev.adminPin,
+          }));
         }
 
         const { data: productsData, error: productsError } = await supabase
@@ -639,6 +665,7 @@ export default function App() {
           onDeleteProduct={handleDeleteProduct}
           onResetProducts={handleResetProducts}
           categories={categories}
+          onToggleCategoryVisibility={toggleCategoryVisibility}
           onAddCategory={handleAddCategory}
           onUpdateCategory={handleUpdateCategory}
           onDeleteCategory={handleDeleteCategory}

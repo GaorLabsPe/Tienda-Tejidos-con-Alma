@@ -17,7 +17,7 @@ export const CategoryGridSection: React.FC<CategoryGridSectionProps> = ({
   categories = DEFAULT_CATEGORIES,
   products = [],
 }) => {
-  const visualCategories = categories.filter((c) => c.id !== 'todos');
+  const visualCategories = categories.filter((c) => c.id !== 'todos' && c.isVisible !== false);
 
   return (
     <section className="mb-6">

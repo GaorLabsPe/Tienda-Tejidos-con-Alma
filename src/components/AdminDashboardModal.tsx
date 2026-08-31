@@ -28,7 +28,12 @@ import {
   Check,
   AlertTriangle,
   FolderPlus,
-  Smile
+  Smile,
+  Instagram,
+  Facebook,
+  Video,
+  KeyRound,
+  Share2
 } from 'lucide-react';
 
 const PRESET_BADGES = ['Más Vendido ⭐', 'Novedad ✨', 'Oferta 🔥', 'Exclusivo 💜', 'Popular 🌻', 'Personalizable 🎀'];
@@ -55,6 +60,7 @@ interface AdminDashboardModalProps {
   onDeleteProduct: (productId: string) => void;
   onResetProducts: () => void;
   categories: CategoryItem[];
+  onToggleCategoryVisibility: (categoryId: string) => void;
   onAddCategory: (newCategory: CategoryItem) => void;
   onUpdateCategory: (updatedCategory: CategoryItem) => void;
   onDeleteCategory: (categoryId: string) => void;
@@ -73,6 +79,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   onDeleteProduct,
   onResetProducts,
   categories,
+  onToggleCategoryVisibility,
   onAddCategory,
   onUpdateCategory,
   onDeleteCategory,
@@ -103,6 +110,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const categoryFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [showSettingsPin, setShowSettingsPin] = useState(false);
   const [form, setForm] = useState<StoreSettings>({ ...settings });
 
   useEffect(() => {
@@ -120,7 +128,8 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === '1982') {
+    const correctPin = (settings.adminPin || '1982').trim();
+    if (pin.trim() === correctPin) {
       setIsAuthenticated(true);
       setPinError(false);
     } else {
@@ -249,6 +258,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       emoji: '🌸',
       subtitle: 'Detalles y flores tejidas',
       image: 'https://images.unsplash.com/photo-1597848212624-a19eb35e2651?w=800&auto=format&fit=crop&q=80',
+      isVisible: true,
     });
     setIsCreatingNewCategory(true);
     setIsEditingCategory(true);
@@ -295,6 +305,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       emoji: editingCategory.emoji?.trim() || '🌸',
       subtitle: editingCategory.subtitle?.trim() || 'Colección artesanal',
       image: editingCategory.image?.trim() || 'https://images.unsplash.com/photo-1597848212624-a19eb35e2651?w=800&auto=format&fit=crop&q=80',
+      isVisible: editingCategory.isVisible !== false,
     };
 
     if (isCreatingNewCategory) {
@@ -372,7 +383,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
               </div>
               {pinError && (
                 <p className="text-red-500 text-xs text-center mt-2 font-bold flex items-center justify-center gap-1">
-                  <span>⚠️ Clave incorrecta. Intenta con 1982</span>
+                  <span>⚠️ Clave PIN incorrecta. Inténtalo nuevamente.</span>
                 </p>
               )}
             </div>
@@ -386,7 +397,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             </button>
             
             <p className="text-[11px] text-stone-400 text-center font-medium">
-              PIN por defecto: <strong className="text-stone-600">1982</strong>
+              🔒 Acceso protegido exclusivamente para el administrador
             </p>
           </form>
         </div>
@@ -749,10 +760,16 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                   )
                   .map(cat => {
                     const assignedProductsCount = products.filter(p => p.category === cat.id).length;
+                    const isVisible = cat.isVisible !== false;
+
                     return (
                       <div 
                         key={cat.id} 
-                        className="p-3 rounded-2xl border border-stone-200/90 bg-white transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs hover:border-[#653977]/30"
+                        className={`p-3 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs ${
+                          isVisible 
+                            ? 'bg-white border-stone-200/90 hover:border-[#653977]/30' 
+                            : 'bg-stone-50/90 border-dashed border-stone-300 opacity-75'
+                        }`}
                       >
                         {/* Left: Thumbnail & Info */}
                         <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
@@ -760,13 +777,18 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                             <img 
                               src={cat.image} 
                               alt={cat.name} 
-                              className="w-full h-full object-cover" 
+                              className={`w-full h-full object-cover ${!isVisible ? 'grayscale-40' : ''}`} 
                               loading="lazy"
                               referrerPolicy="no-referrer"
                             />
                             <div className="absolute top-1 left-1 bg-white/90 backdrop-blur-xs text-xs px-1.5 py-0.5 rounded-md shadow-2xs">
                               {cat.emoji || '🌸'}
                             </div>
+                            {!isVisible && (
+                              <span className="absolute -top-1 -right-1 bg-stone-700 text-white text-[8px] font-bold px-1.5 py-0.2 rounded-full shadow-2xs">
+                                Oculta
+                              </span>
+                            )}
                           </div>
 
                           <div className="min-w-0 flex-1">
@@ -777,6 +799,11 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-[#653977] border border-purple-100">
                                 {assignedProductsCount} {assignedProductsCount === 1 ? 'producto' : 'productos'}
                               </span>
+                              {!isVisible && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-stone-200 text-stone-600">
+                                  No visible en tienda
+                                </span>
+                              )}
                             </div>
                             
                             <p className="text-[11px] text-stone-500 font-medium truncate mt-0.5">
@@ -791,24 +818,49 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
                         {/* Right: Actions */}
                         <div className="flex items-center justify-end gap-1.5 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100">
+                          {/* Visibility Toggle */}
+                          <button
+                            type="button"
+                            onClick={() => onToggleCategoryVisibility(cat.id)}
+                            title={isVisible ? 'Ocultar categoría en la tienda' : 'Mostrar categoría en la tienda'}
+                            className={`py-1.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer touch-manipulation ${
+                              isVisible 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' 
+                                : 'bg-stone-200 text-stone-600 border border-stone-300 hover:bg-stone-300'
+                            }`}
+                          >
+                            {isVisible ? (
+                              <>
+                                <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Visible</span>
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="w-3.5 h-3.5 text-stone-500" />
+                                <span>Oculta</span>
+                              </>
+                            )}
+                          </button>
+
+                          {/* Edit Button */}
                           <button
                             type="button"
                             onClick={() => handleOpenEditCategory(cat)}
                             title="Editar Categoría"
-                            className="p-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#653977] border border-purple-200 transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
+                            className="py-1.5 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#653977] border border-purple-200 transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Editar</span>
                           </button>
 
+                          {/* Delete Button */}
                           <button
                             type="button"
                             onClick={() => setCategoryToDelete(cat)}
                             title="Eliminar Categoría"
-                            className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
+                            className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors flex items-center justify-center text-xs font-bold cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            <span>Eliminar</span>
                           </button>
                         </div>
                       </div>
@@ -931,6 +983,214 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                       placeholder="987 654 321"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Redes Sociales Oficiales */}
+              <div className="bg-white p-4 rounded-2xl border border-stone-200/90 shadow-2xs space-y-3.5">
+                <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                  <div className="flex items-center gap-2 text-[#54286B] font-black text-xs uppercase tracking-wider">
+                    <Share2 className="w-3.5 h-3.5 text-[#653977]" />
+                    <span>Redes Sociales en Pie de Página</span>
+                  </div>
+                  <span className="text-[10px] text-stone-400 font-medium">Activa u oculta cada red</span>
+                </div>
+
+                {/* TikTok Card */}
+                <div className={`p-3 rounded-xl border transition-all space-y-2 ${
+                  form.showTiktok !== false 
+                    ? 'bg-stone-50/70 border-stone-200' 
+                    : 'bg-stone-100/60 border-dashed border-stone-300 opacity-80'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Video className="w-3.5 h-3.5 text-stone-900" />
+                      <span>TikTok</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setForm({...form, showTiktok: form.showTiktok === false ? true : false})}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[10px] flex items-center gap-1 transition-all cursor-pointer ${
+                        form.showTiktok !== false
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-stone-200 text-stone-600 border border-stone-300'
+                      }`}
+                    >
+                      {form.showTiktok !== false ? (
+                        <>
+                          <Eye className="w-3 h-3 text-emerald-700" />
+                          <span>Visible</span>
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="w-3 h-3 text-stone-500" />
+                          <span>Oculto</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="url" 
+                      value={form.tiktokUrl || ''} 
+                      onChange={e => setForm({...form, tiktokUrl: e.target.value})} 
+                      className="w-full text-xs font-bold p-2.5 pr-16 rounded-xl bg-white border border-stone-200 focus:border-stone-900 outline-none text-stone-800" 
+                      placeholder="https://www.tiktok.com/@tu_cuenta"
+                    />
+                    {form.tiktokUrl && (
+                      <a 
+                        href={form.tiktokUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2 py-1 rounded-lg"
+                      >
+                        Probar ↗
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Instagram Card */}
+                <div className={`p-3 rounded-xl border transition-all space-y-2 ${
+                  form.showInstagram !== false 
+                    ? 'bg-stone-50/70 border-stone-200' 
+                    : 'bg-stone-100/60 border-dashed border-stone-300 opacity-80'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Instagram className="w-3.5 h-3.5 text-pink-600" />
+                      <span>Instagram</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setForm({...form, showInstagram: form.showInstagram === false ? true : false})}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[10px] flex items-center gap-1 transition-all cursor-pointer ${
+                        form.showInstagram !== false
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-stone-200 text-stone-600 border border-stone-300'
+                      }`}
+                    >
+                      {form.showInstagram !== false ? (
+                        <>
+                          <Eye className="w-3 h-3 text-emerald-700" />
+                          <span>Visible</span>
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="w-3 h-3 text-stone-500" />
+                          <span>Oculto</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="url" 
+                      value={form.instagramUrl || ''} 
+                      onChange={e => setForm({...form, instagramUrl: e.target.value})} 
+                      className="w-full text-xs font-bold p-2.5 pr-16 rounded-xl bg-white border border-stone-200 focus:border-pink-500 outline-none text-stone-800" 
+                      placeholder="https://www.instagram.com/tu_cuenta"
+                    />
+                    {form.instagramUrl && (
+                      <a 
+                        href={form.instagramUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-pink-700 bg-pink-50 hover:bg-pink-100 px-2 py-1 rounded-lg"
+                      >
+                        Probar ↗
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Facebook Card */}
+                <div className={`p-3 rounded-xl border transition-all space-y-2 ${
+                  form.showFacebook !== false 
+                    ? 'bg-stone-50/70 border-stone-200' 
+                    : 'bg-stone-100/60 border-dashed border-stone-300 opacity-80'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Facebook className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Facebook</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setForm({...form, showFacebook: form.showFacebook === false ? true : false})}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[10px] flex items-center gap-1 transition-all cursor-pointer ${
+                        form.showFacebook !== false
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-stone-200 text-stone-600 border border-stone-300'
+                      }`}
+                    >
+                      {form.showFacebook !== false ? (
+                        <>
+                          <Eye className="w-3 h-3 text-emerald-700" />
+                          <span>Visible</span>
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="w-3 h-3 text-stone-500" />
+                          <span>Oculto</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="url" 
+                      value={form.facebookUrl || ''} 
+                      onChange={e => setForm({...form, facebookUrl: e.target.value})} 
+                      className="w-full text-xs font-bold p-2.5 pr-16 rounded-xl bg-white border border-stone-200 focus:border-blue-600 outline-none text-stone-800" 
+                      placeholder="https://www.facebook.com/tu_pagina"
+                    />
+                    {form.facebookUrl && (
+                      <a 
+                        href={form.facebookUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg"
+                      >
+                        Probar ↗
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Seguridad y Clave PIN de Acceso */}
+              <div className="bg-white p-4 rounded-2xl border border-stone-200/90 shadow-2xs space-y-3.5">
+                <div className="flex items-center gap-2 text-purple-900 font-black text-xs uppercase tracking-wider border-b border-stone-100 pb-2">
+                  <KeyRound className="w-3.5 h-3.5 text-purple-700" />
+                  <span>Seguridad & Clave PIN del Administrador</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider flex items-center justify-between">
+                    <span>Clave PIN de Acceso</span>
+                    <span className="text-[10px] text-stone-400 font-normal">Privada y confidencial</span>
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type={showSettingsPin ? 'text' : 'password'}
+                      value={form.adminPin || '1982'} 
+                      onChange={e => setForm({...form, adminPin: e.target.value})} 
+                      className="w-full text-sm font-black tracking-widest p-3 pr-12 rounded-xl bg-stone-50 border border-stone-200 focus:bg-white focus:border-[#653977] outline-none text-stone-800" 
+                      placeholder="••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSettingsPin(!showSettingsPin)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
+                      title={showSettingsPin ? 'Ocultar clave' : 'Mostrar clave'}
+                    >
+                      {showSettingsPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-stone-500 font-medium">
+                    🔒 Esta es la clave requerida para entrar a este panel. Nunca se muestra en la pantalla de inicio de sesión.
+                  </p>
                 </div>
               </div>
 
@@ -1580,6 +1840,42 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     className="w-full text-xs font-bold p-3 rounded-xl bg-stone-50 border border-stone-200 focus:bg-white focus:border-[#653977] outline-none text-stone-800" 
                     placeholder="Ej. Eternas & con luz LED, Variedad de colores"
                   />
+                </div>
+
+                {/* Visibility Toggle Switch */}
+                <div className="pt-2 border-t border-stone-200/80">
+                  <div className="flex items-center justify-between p-3 bg-stone-50 rounded-2xl border border-stone-200">
+                    <div>
+                      <span className="text-xs font-bold text-stone-800 block">
+                        Visibilidad en la Tienda
+                      </span>
+                      <span className="text-[10px] text-stone-500 block">
+                        {editingCategory.isVisible !== false ? 'Visible para los clientes en catálogo' : 'Oculta (no se muestra en catálogo)'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditingCategory({ ...editingCategory, isVisible: editingCategory.isVisible === false ? true : false })}
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                        editingCategory.isVisible !== false
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-stone-200 text-stone-600 border border-stone-300'
+                      }`}
+                    >
+                      {editingCategory.isVisible !== false ? (
+                        <>
+                          <Eye className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Visible</span>
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="w-3.5 h-3.5 text-stone-500" />
+                          <span>Oculta</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
