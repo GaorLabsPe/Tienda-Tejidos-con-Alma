@@ -1,6 +1,7 @@
 import React from 'react';
 import { StoreSettings } from '../types';
-import { Settings, MapPin } from 'lucide-react';
+import { MapPin } from 'lucide-react';
+import { useSecretAdminTrigger } from '../utils/secretTrigger';
 
 interface HeaderProps {
   settings: StoreSettings;
@@ -17,54 +18,57 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onGoHome,
 }) => {
+  const handleSecretAdmin = useSecretAdminTrigger(onOpenSettings);
+
   return (
     <header className="bg-white border-b border-[#F0E4F7]">
       {/* Top Banner with Delivery Toggle */}
       <div className="bg-[#653977] text-white px-3.5 py-2 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onGoHome}
-          title="Ir a Inicio"
-          className="flex items-center gap-2 cursor-pointer hover:opacity-90 active:scale-95 transition-all text-left"
-        >
+        <div className="flex items-center gap-2 text-left">
           <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-100">
+          <span 
+            onClick={handleSecretAdmin}
+            className="text-[10px] font-bold uppercase tracking-wider text-purple-100 cursor-pointer select-none touch-manipulation"
+          >
             {settings.storeName}
           </span>
-        </button>
-        <button
-          onClick={onOpenSettings}
-          title="Configurar tienda"
-          className="text-purple-100 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold active:scale-95 cursor-pointer"
-        >
-          <Settings className="w-3.5 h-3.5" />
-          <span>Ajustes</span>
-        </button>
+        </div>
       </div>
 
       {/* Main Brand info */}
       <div className="p-3">
         <div className="flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onGoHome}
-            title="Ir a Inicio"
-            className="flex items-center gap-2.5 text-left cursor-pointer group active:scale-[0.98] transition-all"
-          >
-            <div className="w-10 h-10 rounded-2xl bg-[#F8F2FA] border border-[#E9DAF2] group-hover:border-[#DDC5EA] group-hover:bg-[#F2E5F7] flex items-center justify-center text-2xl shadow-2xs shrink-0 transition-colors">
+          <div className="flex items-center gap-2.5 text-left group">
+            <button
+              type="button"
+              onClick={onGoHome}
+              title="Ir a Inicio"
+              className="w-10 h-10 rounded-2xl bg-[#F8F2FA] border border-[#E9DAF2] group-hover:border-[#DDC5EA] group-hover:bg-[#F2E5F7] flex items-center justify-center text-2xl shadow-2xs shrink-0 transition-colors cursor-pointer"
+            >
               🌻
-            </div>
+            </button>
             <div>
-              <h1 className="text-base font-black text-[#54286B] group-hover:text-[#7A4395] leading-tight uppercase tracking-tight transition-colors">
-                {settings.storeName}
+              <h1 className="text-base font-black text-[#54286B] leading-tight uppercase tracking-tight flex items-center gap-1">
+                <span onClick={onGoHome} className="cursor-pointer group-hover:text-[#7A4395] transition-colors">
+                  {settings.storeName.replace('💜', '').trim()}
+                </span>
+                <span
+                  onClick={handleSecretAdmin}
+                  title="💜"
+                  className="cursor-pointer select-none text-purple-600 hover:scale-125 active:scale-150 transition-transform touch-manipulation px-0.5"
+                >
+                  💜
+                </span>
               </h1>
               <p className="text-[10px] font-bold tracking-wider text-stone-500 uppercase mt-0.5 flex items-center gap-1.5">
                 <span>Ramos Eternos</span>
                 <span className="text-[#B795CC]">•</span>
-                <span className="text-[#653977] font-bold">Inicio</span>
+                <span onClick={onGoHome} className="text-[#653977] font-bold cursor-pointer hover:underline">
+                  Inicio
+                </span>
               </p>
             </div>
-          </button>
+          </div>
         </div>
 
         {/* Delivery / Pickup Switcher (Soft Lilac Pill style) */}
@@ -96,3 +100,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

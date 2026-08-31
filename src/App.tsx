@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Product, CartItem, CartItemOption, StoreSettings } from './types';
-import { PRODUCTS, DEFAULT_STORE_SETTINGS } from './data/catalog';
+import { Product, CartItem, CartItemOption, StoreSettings, CategoryItem } from './types';
+import { PRODUCTS, DEFAULT_STORE_SETTINGS, DEFAULT_CATEGORIES } from './data/catalog';
+import { supabase } from './lib/supabase';
 import { Header } from './components/Header';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetailModal } from './components/ProductDetailModal';
 import { CartDrawer } from './components/CartDrawer';
 import { OrderSuccessModal } from './components/OrderSuccessModal';
-import { StoreSettingsModal } from './components/StoreSettingsModal';
+import { AdminDashboardModal } from './components/AdminDashboardModal';
+import { Footer } from './components/Footer';
 import { HeroEntrance } from './components/HeroEntrance';
 import { BottomNavBar, TabType } from './components/BottomNavBar';
 import { FavoritesView } from './components/FavoritesView';
@@ -15,6 +17,7 @@ import { MostOrderedSection } from './components/MostOrderedSection';
 import { PromotionsSection } from './components/PromotionsSection';
 import { CategoryGridSection } from './components/CategoryGridSection';
 import { ArrowRight } from 'lucide-react';
+import { useSecretAdminTrigger } from './utils/secretTrigger';
 
 export default function App() {
   const [settings, setSettings] = useState<StoreSettings>(() => {
@@ -48,12 +51,204 @@ export default function App() {
   const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('delivery');
   const [selectedCategory, setSelectedCategory] = useState<string>('todos');
 
+  const handleSecretAdmin = useSecretAdminTrigger(() => setIsAdminOpen(true));
+
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
   const [lastOrderMessage, setLastOrderMessage] = useState<string>('');
   const [lastWhatsappUrl, setLastWhatsappUrl] = useState<string>('');
+
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const saved = localStorage.getItem('tejidos_con_alma_products');
+      return saved ? JSON.parse(saved) : PRODUCTS;
+    } catch {
+      return PRODUCTS;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('tejidos_con_alma_products', JSON.stringify(products));
+  }, [products]);
+
+  const [categories, setCategories] = useState<CategoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('tejidos_con_alma_categories');
+      return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
+    } catch {
+      return DEFAULT_CATEGORIES;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('tejidos_con_alma_categories', JSON.stringify(categories));
+  }, [categories]);
+
+  const handleAddCategory = (newCategory: CategoryItem) => {
+    setCategories(prev => [...prev, newCategory]);
+  };
+
+  const handleUpdateCategory = (updatedCategory: CategoryItem) => {
+    setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
+  };
+
+  const handleDeleteCategory = (categoryId: string) => {
+    setCategories(prev => prev.filter(c => c.id !== categoryId));
+  };
+
+  const handleResetCategories = () => {
+    setCategories(DEFAULT_CATEGORIES);
+    localStorage.setItem('tejidos_con_alma_categories', JSON.stringify(DEFAULT_CATEGORIES));
+  };
+
+  const toggleProductVisibility = async (productId: string) => {
+    const updatedProducts = products.map(p => {
+      if (p.id === productId) {
+        const newVisible = p.isVisible === false ? true : false;
+        
+        // Background sync to supabase
+        if (supabase) {
+          supabase.from('products').update({ is_visible: newVisible }).eq('id', productId).then();
+        }
+
+        return { ...p, isVisible: newVisible };
+      }
+      return p;
+    });
+    setProducts(updatedProducts);
+  };
+
+  const handleAddProduct = (newProduct: Product) => {
+    setProducts(prev => [newProduct, ...prev]);
+    if (supabase) {
+      supabase.from('products').insert({
+        id: newProduct.id,
+        name: newProduct.name,
+        category: newProduct.category,
+        category_label: newProduct.categoryLabel,
+        price: newProduct.price,
+        description: newProduct.description,
+        includes: newProduct.includes,
+        image: newProduct.image,
+        badge: newProduct.badge || null,
+        rating: newProduct.rating || 5.0,
+        review_count: newProduct.reviewCount || 10,
+        preparation_time: newProduct.preparationTime || '24 a 48 hrs',
+        is_visible: newProduct.isVisible !== false,
+      }).then();
+    }
+  };
+
+  const handleUpdateProduct = (updatedProduct: Product) => {
+    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    if (supabase) {
+      supabase.from('products').update({
+        name: updatedProduct.name,
+        category: updatedProduct.category,
+        category_label: updatedProduct.categoryLabel,
+        price: updatedProduct.price,
+        description: updatedProduct.description,
+        includes: updatedProduct.includes,
+        image: updatedProduct.image,
+        badge: updatedProduct.badge || null,
+        is_visible: updatedProduct.isVisible !== false,
+        preparation_time: updatedProduct.preparationTime,
+      }).eq('id', updatedProduct.id).then();
+    }
+  };
+
+  const handleDeleteProduct = (productId: string) => {
+    setProducts(prev => prev.filter(p => p.id !== productId));
+    if (supabase) {
+      supabase.from('products').delete().eq('id', productId).then();
+    }
+  };
+
+  const handleResetProducts = () => {
+    setProducts(PRODUCTS);
+    localStorage.setItem('tejidos_con_alma_products', JSON.stringify(PRODUCTS));
+  };
+
+  const handleSaveSettings = async (newSettings: StoreSettings) => {
+    setSettings(newSettings);
+    if (supabase) {
+      const { data } = await supabase.from('store_settings').select('id').limit(1).single();
+      if (data?.id) {
+        await supabase.from('store_settings').update({
+          store_name: newSettings.storeName,
+          whatsapp_number: newSettings.whatsappNumber,
+          whatsapp_display: newSettings.whatsappDisplay,
+          currency: newSettings.currency,
+          currency_symbol: newSettings.currencySymbol,
+          yape_number: newSettings.yapeNumber,
+          plin_number: newSettings.plinNumber,
+          delivery_cost: newSettings.deliveryCost,
+          free_delivery_threshold: newSettings.freeDeliveryThreshold,
+        }).eq('id', data.id);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!supabase) return;
+    
+    const fetchSupabaseData = async () => {
+      try {
+        const { data: storeSettings, error: settingsError } = await supabase
+          .from('store_settings')
+          .select('*')
+          .limit(1)
+          .single();
+          
+        if (storeSettings && !settingsError) {
+          setSettings({
+            storeName: storeSettings.store_name,
+            whatsappNumber: storeSettings.whatsapp_number,
+            whatsappDisplay: storeSettings.whatsapp_display,
+            currency: storeSettings.currency,
+            currencySymbol: storeSettings.currency_symbol,
+            yapeNumber: storeSettings.yape_number || '',
+            plinNumber: storeSettings.plin_number || '',
+            deliveryCost: storeSettings.delivery_cost,
+            freeDeliveryThreshold: storeSettings.free_delivery_threshold,
+            storeAddress: 'Taller San Miguel (Previa coordinación)',
+            openingHours: 'Lunes a Sábado: 9:00 AM - 6:00 PM',
+          });
+        }
+
+        const { data: productsData, error: productsError } = await supabase
+          .from('products')
+          .select('*');
+          
+        if (productsData && !productsError && productsData.length > 0) {
+          // Map DB keys to app keys
+          const mappedProducts = productsData.map(p => ({
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            categoryLabel: p.category_label,
+            price: p.price,
+            description: p.description,
+            includes: p.includes,
+            image: p.image,
+            badge: p.badge,
+            rating: p.rating,
+            reviewCount: p.review_count,
+            preparationTime: p.preparation_time,
+            isVisible: p.is_visible
+          })) as Product[];
+          
+          setProducts(mappedProducts);
+        }
+      } catch (e) {
+        console.error("Error fetching from Supabase:", e);
+      }
+    };
+    
+    fetchSupabaseData();
+  }, []);
 
   useEffect(() => {
     try {
@@ -149,14 +344,15 @@ export default function App() {
   };
 
   const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter((product) => {
-      return selectedCategory === 'todos' || product.category === selectedCategory;
+    return products.filter((product) => {
+      const isCategoryMatch = selectedCategory === 'todos' || product.category === selectedCategory;
+      return isCategoryMatch && product.isVisible !== false;
     });
-  }, [selectedCategory]);
+  }, [products, selectedCategory]);
 
   const favoriteProductsList = useMemo(() => {
-    return PRODUCTS.filter((product) => favorites.includes(product.id));
-  }, [favorites]);
+    return products.filter((product) => favorites.includes(product.id) && product.isVisible !== false);
+  }, [favorites, products]);
 
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -190,6 +386,7 @@ export default function App() {
             deliveryType={deliveryType}
             onDeliveryTypeChange={setDeliveryType}
             onExploreCatalog={() => setActiveTab('catalogo')}
+            onOpenAdmin={() => setIsAdminOpen(true)}
           />
         )}
 
@@ -202,7 +399,7 @@ export default function App() {
                 settings={settings}
                 deliveryType={deliveryType}
                 onDeliveryTypeChange={setDeliveryType}
-                onOpenSettings={() => setIsSettingsOpen(true)}
+                onOpenSettings={() => setIsAdminOpen(true)}
                 onGoHome={() => handleTabChange('inicio')}
               />
             </div>
@@ -224,7 +421,7 @@ export default function App() {
 
                   {/* 2. "Promociones" Carousel Section */}
                   <PromotionsSection
-                    products={PRODUCTS}
+                    products={products.filter(p => p.isVisible !== false)}
                     currencySymbol={settings.currencySymbol}
                     onSelectProduct={(p) => setSelectedProduct(p)}
                     favorites={favorites}
@@ -234,6 +431,8 @@ export default function App() {
 
                   {/* 3. "Categorías" 2-Column Photo Cards Grid */}
                   <CategoryGridSection
+                    categories={categories}
+                    products={products}
                     selectedCategory={selectedCategory}
                     onSelectCategory={(catId) => setSelectedCategory(catId)}
                   />
@@ -252,7 +451,9 @@ export default function App() {
                     </button>
                   )}
                   <h2 className="text-xs sm:text-sm font-black text-[#54286B] uppercase tracking-wider">
-                    {selectedCategory === 'todos' ? 'Todos los Modelos' : `Colección: ${selectedCategory}`}
+                    {selectedCategory === 'todos' 
+                      ? 'Todos los Modelos' 
+                      : `Colección: ${categories.find(c => c.id === selectedCategory)?.name || selectedCategory}`}
                   </h2>
                 </div>
 
@@ -297,6 +498,13 @@ export default function App() {
                   </button>
                 </div>
               )}
+              <Footer 
+                settings={settings}
+                onOpenAdmin={() => setIsAdminOpen(true)}
+                onOpenCustomBuilder={() => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
             </main>
           </div>
         )}
@@ -305,20 +513,39 @@ export default function App() {
         {activeTab === 'favoritos' && (
           <div className="flex-1 flex flex-col pb-6">
             <div className="bg-[#653977] text-white p-3.5 shadow-sm flex items-center justify-between sticky top-0 z-30">
-              <button
-                type="button"
-                onClick={() => handleTabChange('inicio')}
-                className="flex items-center gap-2 text-left cursor-pointer hover:opacity-90 active:scale-95 transition-all"
-                title="Volver a Inicio"
-              >
-                <span className="text-xl">🌻</span>
+              <div className="flex items-center gap-2 text-left">
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('inicio')}
+                  className="text-xl cursor-pointer hover:scale-110 active:scale-95 transition-transform"
+                  title="Volver a Inicio"
+                >
+                  🌻
+                </button>
                 <div>
-                  <h1 className="text-xs font-black uppercase tracking-wider text-white">
-                    {settings.storeName}
+                  <h1 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1">
+                    <span 
+                      onClick={() => handleTabChange('inicio')} 
+                      className="cursor-pointer hover:underline"
+                    >
+                      {settings.storeName.replace('💜', '').trim()}
+                    </span>
+                    <span
+                      onClick={handleSecretAdmin}
+                      title="💜"
+                      className="cursor-pointer select-none text-purple-200 hover:scale-125 active:scale-150 transition-transform touch-manipulation px-0.5 inline-block"
+                    >
+                      💜
+                    </span>
                   </h1>
-                  <span className="text-[10px] text-purple-100 font-bold">← Volver al Inicio</span>
+                  <button 
+                    onClick={() => handleTabChange('inicio')}
+                    className="text-[10px] text-purple-100 font-bold block hover:underline text-left cursor-pointer"
+                  >
+                    ← Volver al Inicio
+                  </button>
                 </div>
-              </button>
+              </div>
               <button
                 type="button"
                 onClick={() => handleTabChange('catalogo')}
@@ -399,12 +626,23 @@ export default function App() {
           whatsappUrl={lastWhatsappUrl}
         />
 
-        {/* Store Settings Modal */}
-        <StoreSettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
+        {/* Admin Dashboard Modal */}
+        <AdminDashboardModal
+          isOpen={isAdminOpen}
+          onClose={() => setIsAdminOpen(false)}
           settings={settings}
-          onSaveSettings={setSettings}
+          onSaveSettings={handleSaveSettings}
+          products={products}
+          onToggleProductVisibility={toggleProductVisibility}
+          onAddProduct={handleAddProduct}
+          onUpdateProduct={handleUpdateProduct}
+          onDeleteProduct={handleDeleteProduct}
+          onResetProducts={handleResetProducts}
+          categories={categories}
+          onAddCategory={handleAddCategory}
+          onUpdateCategory={handleUpdateCategory}
+          onDeleteCategory={handleDeleteCategory}
+          onResetCategories={handleResetCategories}
         />
       </div>
     </div>

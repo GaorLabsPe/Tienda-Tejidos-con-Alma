@@ -1,3 +1,13 @@
+export interface CategoryItem {
+  id: string; // unique slug e.g. 'girasoles', 'tulipanes', 'rosas'
+  name: string; // display name e.g. 'Girasoles'
+  fullName?: string; // e.g. 'Ramos con Girasol'
+  emoji: string; // e.g. '🌻'
+  subtitle?: string; // e.g. 'Eternos & luz'
+  image: string; // Image URL for banner/card
+  count?: number;
+}
+
 export interface ProductOption {
   id: string;
   name: string;
@@ -15,7 +25,7 @@ export interface ProductExtra {
 export interface Product {
   id: string;
   name: string;
-  category: 'girasoles' | 'tulipanes' | 'clasicos' | 'especiales' | 'minis' | 'combos';
+  category: string;
   categoryLabel: string;
   price: number;
   originalPrice?: number;
@@ -28,6 +38,7 @@ export interface Product {
   rating: number;
   reviewCount: number;
   preparationTime: string;
+  isVisible?: boolean;
   availableColors?: string[];
   unitTiers?: {
     units: number;

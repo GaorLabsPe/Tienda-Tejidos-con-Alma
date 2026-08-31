@@ -1,18 +1,23 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { CATEGORIES } from '../data/catalog';
+import { DEFAULT_CATEGORIES } from '../data/catalog';
+import { CategoryItem, Product } from '../types';
 import { Layers } from 'lucide-react';
 
 interface CategoryGridSectionProps {
   selectedCategory: string;
   onSelectCategory: (categoryId: string) => void;
+  categories?: CategoryItem[];
+  products?: Product[];
 }
 
 export const CategoryGridSection: React.FC<CategoryGridSectionProps> = ({
   selectedCategory,
   onSelectCategory,
+  categories = DEFAULT_CATEGORIES,
+  products = [],
 }) => {
-  const visualCategories = CATEGORIES.filter((c) => c.id !== 'todos');
+  const visualCategories = categories.filter((c) => c.id !== 'todos');
 
   return (
     <section className="mb-6">
@@ -41,6 +46,9 @@ export const CategoryGridSection: React.FC<CategoryGridSectionProps> = ({
       <div className="grid grid-cols-2 gap-3 px-0.5">
         {visualCategories.map((cat, idx) => {
           const isSelected = selectedCategory === cat.id;
+          const productCount = products.length > 0 
+            ? products.filter(p => p.category === cat.id && p.isVisible !== false).length 
+            : (cat.count || 0);
 
           return (
             <motion.div
@@ -57,7 +65,7 @@ export const CategoryGridSection: React.FC<CategoryGridSectionProps> = ({
             >
               {/* Category Background Image */}
               <img
-                src={cat.image}
+                src={cat.image || 'https://images.unsplash.com/photo-1597848212624-a19eb35e2651?auto=format&fit=crop&w=800&q=80'}
                 alt={cat.name}
                 className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
               />
@@ -68,7 +76,7 @@ export const CategoryGridSection: React.FC<CategoryGridSectionProps> = ({
               {/* Top Mini Tag */}
               <div className="absolute top-2.5 left-2.5">
                 <span className="text-[10px] bg-white/90 backdrop-blur-xs text-[#54286B] px-2 py-0.5 rounded-full font-bold shadow-xs">
-                  {cat.emoji}
+                  {cat.emoji || '🌸'}
                 </span>
               </div>
 
@@ -78,9 +86,9 @@ export const CategoryGridSection: React.FC<CategoryGridSectionProps> = ({
                   {cat.name}
                 </h3>
                 <p className="text-[10px] text-purple-200 font-medium flex items-center gap-1 mt-0.5">
-                  <span>{cat.count} modelos</span>
+                  <span>{productCount} {productCount === 1 ? 'modelo' : 'modelos'}</span>
                   <span>•</span>
-                  <span className="text-emerald-300 font-bold">Ver modelos →</span>
+                  <span className="text-emerald-300 font-bold">Ver →</span>
                 </p>
               </div>
             </motion.div>

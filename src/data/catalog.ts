@@ -1,4 +1,4 @@
-import { Product, ProductExtra, StoreSettings } from '../types';
+import { Product, ProductExtra, StoreSettings, CategoryItem } from '../types';
 import heroTulipsImg from '../assets/images/hero_crochet_tulips_1788106762067.jpg';
 
 export const HERO_FEATURED_IMAGE = heroTulipsImg;
@@ -582,6 +582,57 @@ export const PRODUCTS: Product[] = [
   }
 ];
 
+export const DEFAULT_CATEGORIES: CategoryItem[] = [
+  { 
+    id: 'girasoles', 
+    name: 'Girasoles', 
+    fullName: 'Ramos con Girasol',
+    emoji: '🌻', 
+    subtitle: 'Eternos & luz',
+    image: 'https://images.unsplash.com/photo-1597848212624-a19eb35e2651?auto=format&fit=crop&w=800&q=80',
+  },
+  { 
+    id: 'tulipanes', 
+    name: 'Tulipanes', 
+    fullName: 'Tulipanes Crochet',
+    emoji: '🌷', 
+    subtitle: 'Variedad de colores',
+    image: heroTulipsImg,
+  },
+  { 
+    id: 'clasicos', 
+    name: 'Ramos Clásicos', 
+    fullName: 'Rosas & Ramos Clásicos',
+    emoji: '💐', 
+    subtitle: 'Elegantes & eternos',
+    image: 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&w=800&q=80',
+  },
+  { 
+    id: 'especiales', 
+    name: 'Con Luces LED', 
+    fullName: 'Especiales & Cúpulas LED',
+    emoji: '✨', 
+    subtitle: 'Brillo mágico',
+    image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+  },
+  { 
+    id: 'minis', 
+    name: 'Minis & Llaveros', 
+    fullName: 'Minis & Amigurumis',
+    emoji: '🌸', 
+    subtitle: 'Detalles tiernos',
+    image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=800&q=80',
+  },
+  { 
+    id: 'combos', 
+    name: 'Packs x Cantidad', 
+    fullName: 'Packs x 1, 3 o 6 Unid.',
+    emoji: '🏷️', 
+    subtitle: 'Precios especiales',
+    image: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=800&q=80',
+  },
+];
+
 export const CATEGORIES = [
   { 
     id: 'todos', 
@@ -592,60 +643,7 @@ export const CATEGORIES = [
     image: heroTulipsImg,
     count: PRODUCTS.length 
   },
-  { 
-    id: 'girasoles', 
-    name: 'Girasoles', 
-    fullName: 'Ramos con Girasol',
-    emoji: '🌻', 
-    subtitle: 'Eternos & luz',
-    image: 'https://images.unsplash.com/photo-1597848212624-a19eb35e2651?auto=format&fit=crop&w=800&q=80',
-    count: PRODUCTS.filter(p => p.category === 'girasoles').length 
-  },
-  { 
-    id: 'tulipanes', 
-    name: 'Tulipanes', 
-    fullName: 'Tulipanes Crochet',
-    emoji: '🌷', 
-    subtitle: 'Variedad de colores',
-    image: heroTulipsImg,
-    count: PRODUCTS.filter(p => p.category === 'tulipanes').length 
-  },
-  { 
-    id: 'clasicos', 
-    name: 'Ramos Clásicos', 
-    fullName: 'Rosas & Ramos Clásicos',
-    emoji: '💐', 
-    subtitle: 'Elegantes & eternos',
-    image: 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&w=800&q=80',
-    count: PRODUCTS.filter(p => p.category === 'clasicos').length 
-  },
-  { 
-    id: 'especiales', 
-    name: 'Con Luces LED', 
-    fullName: 'Especiales & Cúpulas LED',
-    emoji: '✨', 
-    subtitle: 'Brillo mágico',
-    image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
-    count: PRODUCTS.filter(p => p.category === 'especiales').length 
-  },
-  { 
-    id: 'minis', 
-    name: 'Minis & Llaveros', 
-    fullName: 'Minis & Amigurumis',
-    emoji: '🌸', 
-    subtitle: 'Detalles tiernos',
-    image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=800&q=80',
-    count: PRODUCTS.filter(p => p.category === 'minis').length 
-  },
-  { 
-    id: 'combos', 
-    name: 'Packs x Cantidad', 
-    fullName: 'Packs x 1, 3 o 6 Unid.',
-    emoji: '🏷️', 
-    subtitle: 'Precios especiales',
-    image: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=800&q=80',
-    count: PRODUCTS.filter(p => p.category === 'combos').length 
-  },
+  ...DEFAULT_CATEGORIES
 ];
 
 export const REVIEWS = [

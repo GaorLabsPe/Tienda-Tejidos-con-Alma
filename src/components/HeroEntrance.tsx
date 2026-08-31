@@ -2,12 +2,14 @@ import React from 'react';
 import { StoreSettings } from '../types';
 import { MapPin, Sparkles, ChevronDown, ArrowRight } from 'lucide-react';
 import { HERO_FEATURED_IMAGE } from '../data/catalog';
+import { useSecretAdminTrigger } from '../utils/secretTrigger';
 
 interface HeroEntranceProps {
   settings: StoreSettings;
   deliveryType: 'delivery' | 'pickup';
   onDeliveryTypeChange: (type: 'delivery' | 'pickup') => void;
   onExploreCatalog: () => void;
+  onOpenAdmin?: () => void;
 }
 
 export const HeroEntrance: React.FC<HeroEntranceProps> = ({
@@ -15,7 +17,10 @@ export const HeroEntrance: React.FC<HeroEntranceProps> = ({
   deliveryType,
   onDeliveryTypeChange,
   onExploreCatalog,
+  onOpenAdmin = () => {},
 }) => {
+  const handleSecretAdmin = useSecretAdminTrigger(onOpenAdmin);
+
   return (
     <div className="flex-1 flex flex-col justify-between bg-[#FCFAFE] relative overflow-hidden">
       {/* 1. TOP WARM BURGUNDY STATUS BAR */}
@@ -50,8 +55,15 @@ export const HeroEntrance: React.FC<HeroEntranceProps> = ({
 
       {/* 2. BRAND TITLE HEADER */}
       <div className="bg-white px-4 py-2.5 sm:py-3 text-center border-b border-[#F0E4F7] shadow-2xs shrink-0">
-        <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-[#54286B] uppercase font-sans">
-          {settings.storeName}
+        <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-[#54286B] uppercase font-sans flex items-center justify-center gap-1.5">
+          <span>{settings.storeName.replace('💜', '').trim()}</span>
+          <span
+            onClick={handleSecretAdmin}
+            title="💜"
+            className="cursor-pointer select-none text-purple-600 hover:scale-125 active:scale-150 transition-transform touch-manipulation px-1 inline-block"
+          >
+            💜
+          </span>
         </h1>
         <p className="text-[9px] sm:text-[10px] font-bold tracking-[0.2em] text-[#9363A8] uppercase mt-0.5">
           TALLER ARTESANAL • RAMOS ETERNOS
@@ -131,3 +143,4 @@ export const HeroEntrance: React.FC<HeroEntranceProps> = ({
     </div>
   );
 };
+
