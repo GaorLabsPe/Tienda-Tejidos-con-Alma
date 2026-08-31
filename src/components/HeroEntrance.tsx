@@ -124,7 +124,7 @@ export const HeroEntrance: React.FC<HeroEntranceProps> = ({
           onClick={onExploreCatalog}
           className="w-full py-3.5 px-4 bg-[#653977] hover:bg-[#552965] active:bg-[#451C53] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md shadow-[#653977]/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98] uppercase tracking-wider cursor-pointer"
         >
-          <span>Ver Menú Completo</span>
+          <span>Ver Catálogo Completo</span>
           <ArrowRight className="w-4 h-4 text-purple-100" />
         </button>
       </div>
