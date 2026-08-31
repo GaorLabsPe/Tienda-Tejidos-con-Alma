@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StoreSettings, Product, CategoryItem } from '../types';
 import { supabase } from '../lib/supabase';
+import { checkSupabaseHealth, pushFullCatalogToSupabase, SupabaseHealthReport } from '../lib/supabaseDb';
 import { 
   Save, 
   X, 
@@ -37,7 +38,9 @@ import {
   Share2,
   Loader2,
   Wifi,
-  Database
+  Database,
+  RefreshCw,
+  Server
 } from 'lucide-react';
 
 const PRESET_BADGES = ['Más Vendido ⭐', 'Novedad ✨', 'Oferta 🔥', 'Exclusivo 💜', 'Popular 🌻', 'Personalizable 🎀'];
@@ -115,6 +118,12 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const [isUploadingProductImg, setIsUploadingProductImg] = useState(false);
   const [isUploadingCategoryImg, setIsUploadingCategoryImg] = useState(false);
 
+  // Supabase Health & Sync State
+  const [healthReport, setHealthReport] = useState<SupabaseHealthReport | null>(null);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [showHealthModal, setShowHealthModal] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const categoryFileInputRef = useRef<HTMLInputElement | null>(null);
   const [showSettingsPin, setShowSettingsPin] = useState(false);
@@ -123,6 +132,41 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   useEffect(() => {
     setForm({ ...settings });
   }, [settings]);
+
+  useEffect(() => {
+    if (isOpen) {
+      handleRunHealthCheck();
+    }
+  }, [isOpen]);
+
+  const handleRunHealthCheck = async () => {
+    setIsCheckingHealth(true);
+    try {
+      const rep = await checkSupabaseHealth();
+      setHealthReport(rep);
+    } catch (err) {
+      console.error('Health check error:', err);
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  };
+
+  const handlePushAllCatalog = async () => {
+    setIsSyncingAll(true);
+    try {
+      const res = await pushFullCatalogToSupabase(products, categories, form);
+      if (res.success) {
+        showNotification(res.message);
+        handleRunHealthCheck();
+      } else {
+        alert('Error al sincronizar: ' + res.message);
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -539,16 +583,35 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             <div>
               <div className="flex items-center gap-1.5">
                 <h2 className="font-black text-sm uppercase tracking-wide text-white">Panel Administrador</h2>
-                <span className="bg-emerald-400/20 text-emerald-300 text-[9px] font-bold px-2 py-0.5 rounded-full border border-emerald-400/30 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>En Línea (Supabase)</span>
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowHealthModal(true)}
+                  className={`text-[9px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 cursor-pointer transition-all hover:scale-105 ${
+                    healthReport?.overallStatus === 'ok'
+                      ? 'bg-emerald-400/20 text-emerald-300 border-emerald-400/30'
+                      : 'bg-amber-400/20 text-amber-200 border-amber-400/30'
+                  }`}
+                  title="Ver Diagnóstico de Conexión a Base de Datos"
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${healthReport?.overallStatus === 'ok' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                  <span>{healthReport?.overallStatus === 'ok' ? `En Línea (${healthReport.activeSchema || 'Supabase'})` : 'Diagnóstico BD ⚠️'}</span>
+                </button>
               </div>
               <p className="text-[10px] text-purple-200 font-medium truncate max-w-[200px] sm:max-w-xs">{form.storeName}</p>
             </div>
           </div>
           
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={isSyncingAll}
+              onClick={handlePushAllCatalog}
+              title="Forzar Subida de Catálogo a Supabase"
+              className="px-2.5 py-1.5 bg-white/15 hover:bg-white/25 disabled:opacity-50 text-white rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 border border-white/20"
+            >
+              <RefreshCw className={`w-3 h-3 ${isSyncingAll ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Subir Catálogo a BD</span>
+            </button>
             <button
               type="button"
               onClick={handleLogout}
@@ -2122,6 +2185,106 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                 className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm cursor-pointer"
               >
                 Restaurar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 9. SUPABASE DIAGNOSTIC & SYNC MODAL */}
+      {/* ========================================================================= */}
+      {showHealthModal && (
+        <div className="fixed inset-0 z-70 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setShowHealthModal(false)} />
+          <div className="relative bg-white rounded-3xl p-5 max-w-md w-full shadow-2xl space-y-4 border border-purple-100 z-10 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#653977] flex items-center justify-center">
+                  <Database className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-stone-800">Estado de Supabase</h4>
+                  <p className="text-[10px] text-stone-500">Diagnóstico de tablas y almacenamiento</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHealthModal(false)}
+                className="p-1 text-stone-400 hover:text-stone-700 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Diagnostic Table */}
+            <div className="space-y-2 text-xs">
+              <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-stone-500 font-medium">Servidor:</span>
+                  <span className="font-mono text-[11px] font-bold text-[#653977]">msupabase.mariasuite.cloud</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-stone-500 font-medium">Esquema Activo:</span>
+                  <span className="font-bold px-2 py-0.5 bg-purple-100 text-[#653977] rounded-lg">
+                    {healthReport?.activeSchema || 'Auto-detectando'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-stone-400">Tablas Detectadas</p>
+                
+                <div className="flex items-center justify-between p-2 rounded-xl bg-stone-50 border border-stone-100">
+                  <span className="font-medium text-stone-700">📦 Productos (products)</span>
+                  <span className={`font-bold text-[11px] ${healthReport?.tables.products.exists ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {healthReport?.tables.products.exists ? `✓ OK (${healthReport.tables.products.count})` : '✕ No encontrada'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-xl bg-stone-50 border border-stone-100">
+                  <span className="font-medium text-stone-700">⚙️ Configuración (store_settings)</span>
+                  <span className={`font-bold text-[11px] ${healthReport?.tables.store_settings.exists ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {healthReport?.tables.store_settings.exists ? '✓ OK' : '✕ No encontrada'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-xl bg-stone-50 border border-stone-100">
+                  <span className="font-medium text-stone-700">🏷️ Categorías (categories)</span>
+                  <span className={`font-bold text-[11px] ${healthReport?.tables.categories.exists ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {healthReport?.tables.categories.exists ? `✓ OK (${healthReport.tables.categories.count})` : '✕ No encontrada'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-xl bg-stone-50 border border-stone-100">
+                  <span className="font-medium text-stone-700">📸 Storage Bucket (TEJIDOS)</span>
+                  <span className={`font-bold text-[11px] ${healthReport?.storage.accessible ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {healthReport?.storage.accessible ? `✓ OK (${healthReport.storage.bucket})` : '⚠️ No público'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2 pt-2 border-t">
+              <button
+                type="button"
+                disabled={isSyncingAll}
+                onClick={handlePushAllCatalog}
+                className="w-full py-2.5 px-4 bg-[#653977] hover:bg-[#532d63] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingAll ? 'animate-spin' : ''}`} />
+                <span>{isSyncingAll ? 'Sincronizando Catálogo...' : 'Forzar Sincronización de Catálogo'}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isCheckingHealth}
+                onClick={handleRunHealthCheck}
+                className="w-full py-2 px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className={`w-3 h-3 ${isCheckingHealth ? 'animate-spin' : ''}`} />
+                <span>Re-verificar Conexión</span>
               </button>
             </div>
           </div>
