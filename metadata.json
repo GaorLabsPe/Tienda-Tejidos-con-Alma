@@ -1,0 +1,6 @@
+{
+  "name": "Tejidos con Alma - Catálogo & Pedidos WhatsApp",
+  "description": "Catálogo virtual interactivo de ramos y flores tejidas a crochet con personalizador de ramos, selección de envolturas y dedicatorias, y envío directo a WhatsApp estilo PedidosYa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
