@@ -35,7 +35,9 @@ import {
   Video,
   KeyRound,
   Share2,
-  Loader2
+  Loader2,
+  Wifi,
+  Database
 } from 'lucide-react';
 
 const PRESET_BADGES = ['Más Vendido ⭐', 'Novedad ✨', 'Oferta 🔥', 'Exclusivo 💜', 'Popular 🌻', 'Personalizable 🎀'];
@@ -537,8 +539,9 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             <div>
               <div className="flex items-center gap-1.5">
                 <h2 className="font-black text-sm uppercase tracking-wide text-white">Panel Administrador</h2>
-                <span className="bg-emerald-400/20 text-emerald-300 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-emerald-400/30">
-                  {products.length} productos
+                <span className="bg-emerald-400/20 text-emerald-300 text-[9px] font-bold px-2 py-0.5 rounded-full border border-emerald-400/30 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>En Línea (Supabase)</span>
                 </span>
               </div>
               <p className="text-[10px] text-purple-200 font-medium truncate max-w-[200px] sm:max-w-xs">{form.storeName}</p>

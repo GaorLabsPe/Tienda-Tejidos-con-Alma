@@ -86,25 +86,54 @@ export default function App() {
     localStorage.setItem('tejidos_con_alma_categories', JSON.stringify(categories));
   }, [categories]);
 
-  const toggleCategoryVisibility = (categoryId: string) => {
-    setCategories(prev => prev.map(c => {
+  const toggleCategoryVisibility = async (categoryId: string) => {
+    const updated = categories.map(c => {
       if (c.id === categoryId) {
         return { ...c, isVisible: c.isVisible === false ? true : false };
       }
       return c;
-    }));
+    });
+    setCategories(updated);
+    if (supabase) {
+      const cat = updated.find(c => c.id === categoryId);
+      if (cat) {
+        await supabase.from('categories').update({ is_visible: cat.isVisible !== false }).eq('id', categoryId);
+      }
+    }
   };
 
-  const handleAddCategory = (newCategory: CategoryItem) => {
+  const handleAddCategory = async (newCategory: CategoryItem) => {
     setCategories(prev => [...prev, newCategory]);
+    if (supabase) {
+      await supabase.from('categories').insert({
+        id: newCategory.id,
+        name: newCategory.name,
+        emoji: newCategory.emoji || '🌸',
+        subtitle: newCategory.subtitle || null,
+        image: newCategory.image,
+        is_visible: newCategory.isVisible !== false,
+      });
+    }
   };
 
-  const handleUpdateCategory = (updatedCategory: CategoryItem) => {
+  const handleUpdateCategory = async (updatedCategory: CategoryItem) => {
     setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
+    if (supabase) {
+      await supabase.from('categories').update({
+        name: updatedCategory.name,
+        emoji: updatedCategory.emoji || '🌸',
+        subtitle: updatedCategory.subtitle || null,
+        image: updatedCategory.image,
+        is_visible: updatedCategory.isVisible !== false,
+      }).eq('id', updatedCategory.id);
+    }
   };
 
-  const handleDeleteCategory = (categoryId: string) => {
+  const handleDeleteCategory = async (categoryId: string) => {
     setCategories(prev => prev.filter(c => c.id !== categoryId));
+    if (supabase) {
+      await supabase.from('categories').delete().eq('id', categoryId);
+    }
   };
 
   const handleResetCategories = () => {
@@ -129,15 +158,16 @@ export default function App() {
     setProducts(updatedProducts);
   };
 
-  const handleAddProduct = (newProduct: Product) => {
+  const handleAddProduct = async (newProduct: Product) => {
     setProducts(prev => [newProduct, ...prev]);
     if (supabase) {
-      supabase.from('products').insert({
+      await supabase.from('products').insert({
         id: newProduct.id,
         name: newProduct.name,
         category: newProduct.category,
         category_label: newProduct.categoryLabel,
         price: newProduct.price,
+        original_price: newProduct.originalPrice || null,
         description: newProduct.description,
         includes: newProduct.includes,
         image: newProduct.image,
@@ -146,32 +176,33 @@ export default function App() {
         review_count: newProduct.reviewCount || 10,
         preparation_time: newProduct.preparationTime || '24 a 48 hrs',
         is_visible: newProduct.isVisible !== false,
-      }).then();
+      });
     }
   };
 
-  const handleUpdateProduct = (updatedProduct: Product) => {
+  const handleUpdateProduct = async (updatedProduct: Product) => {
     setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
     if (supabase) {
-      supabase.from('products').update({
+      await supabase.from('products').update({
         name: updatedProduct.name,
         category: updatedProduct.category,
         category_label: updatedProduct.categoryLabel,
         price: updatedProduct.price,
+        original_price: updatedProduct.originalPrice || null,
         description: updatedProduct.description,
         includes: updatedProduct.includes,
         image: updatedProduct.image,
         badge: updatedProduct.badge || null,
         is_visible: updatedProduct.isVisible !== false,
         preparation_time: updatedProduct.preparationTime,
-      }).eq('id', updatedProduct.id).then();
+      }).eq('id', updatedProduct.id);
     }
   };
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: string) => {
     setProducts(prev => prev.filter(p => p.id !== productId));
     if (supabase) {
-      supabase.from('products').delete().eq('id', productId).then();
+      await supabase.from('products').delete().eq('id', productId);
     }
   };
 
@@ -183,28 +214,32 @@ export default function App() {
   const handleSaveSettings = async (newSettings: StoreSettings) => {
     setSettings(newSettings);
     if (supabase) {
-      const { data } = await supabase.from('store_settings').select('id').limit(1).single();
+      const { data } = await supabase.from('store_settings').select('id').limit(1).maybeSingle();
+      const payload = {
+        store_name: newSettings.storeName,
+        whatsapp_number: newSettings.whatsappNumber,
+        whatsapp_display: newSettings.whatsappDisplay,
+        currency: newSettings.currency,
+        currency_symbol: newSettings.currencySymbol,
+        yape_number: newSettings.yapeNumber,
+        plin_number: newSettings.plinNumber,
+        delivery_cost: newSettings.deliveryCost,
+        free_delivery_threshold: newSettings.freeDeliveryThreshold,
+        store_address: newSettings.storeAddress,
+        opening_hours: newSettings.openingHours,
+        tiktok_url: newSettings.tiktokUrl,
+        show_tiktok: newSettings.showTiktok,
+        instagram_url: newSettings.instagramUrl,
+        show_instagram: newSettings.showInstagram,
+        facebook_url: newSettings.facebookUrl,
+        show_facebook: newSettings.showFacebook,
+        admin_pin: newSettings.adminPin,
+      };
+
       if (data?.id) {
-        await supabase.from('store_settings').update({
-          store_name: newSettings.storeName,
-          whatsapp_number: newSettings.whatsappNumber,
-          whatsapp_display: newSettings.whatsappDisplay,
-          currency: newSettings.currency,
-          currency_symbol: newSettings.currencySymbol,
-          yape_number: newSettings.yapeNumber,
-          plin_number: newSettings.plinNumber,
-          delivery_cost: newSettings.deliveryCost,
-          free_delivery_threshold: newSettings.freeDeliveryThreshold,
-          store_address: newSettings.storeAddress,
-          opening_hours: newSettings.openingHours,
-          tiktok_url: newSettings.tiktokUrl,
-          show_tiktok: newSettings.showTiktok,
-          instagram_url: newSettings.instagramUrl,
-          show_instagram: newSettings.showInstagram,
-          facebook_url: newSettings.facebookUrl,
-          show_facebook: newSettings.showFacebook,
-          admin_pin: newSettings.adminPin,
-        }).eq('id', data.id);
+        await supabase.from('store_settings').update(payload).eq('id', data.id);
+      } else {
+        await supabase.from('store_settings').insert([payload]);
       }
     }
   };
@@ -214,11 +249,12 @@ export default function App() {
     
     const fetchSupabaseData = async () => {
       try {
+        // 1. Fetch Store Settings
         const { data: storeSettings, error: settingsError } = await supabase
           .from('store_settings')
           .select('*')
           .limit(1)
-          .single();
+          .maybeSingle();
           
         if (storeSettings && !settingsError) {
           setSettings(prev => ({
@@ -244,29 +280,49 @@ export default function App() {
           }));
         }
 
+        // 2. Fetch Products
         const { data: productsData, error: productsError } = await supabase
           .from('products')
-          .select('*');
+          .select('*')
+          .order('created_at', { ascending: false });
           
         if (productsData && !productsError && productsData.length > 0) {
-          // Map DB keys to app keys
           const mappedProducts = productsData.map(p => ({
             id: p.id,
             name: p.name,
             category: p.category,
             categoryLabel: p.category_label,
-            price: p.price,
+            price: Number(p.price),
+            originalPrice: p.original_price ? Number(p.original_price) : undefined,
             description: p.description,
-            includes: p.includes,
+            includes: Array.isArray(p.includes) ? p.includes : [],
             image: p.image,
             badge: p.badge,
-            rating: p.rating,
-            reviewCount: p.review_count,
+            rating: Number(p.rating || 5.0),
+            reviewCount: Number(p.review_count || 10),
             preparationTime: p.preparation_time,
-            isVisible: p.is_visible
+            isVisible: p.is_visible !== false
           })) as Product[];
           
           setProducts(mappedProducts);
+        }
+
+        // 3. Fetch Categories
+        const { data: categoriesData, error: catError } = await supabase
+          .from('categories')
+          .select('*')
+          .order('id');
+
+        if (categoriesData && !catError && categoriesData.length > 0) {
+          const mappedCategories = categoriesData.map(c => ({
+            id: c.id,
+            name: c.name,
+            emoji: c.emoji || '🌸',
+            subtitle: c.subtitle || '',
+            image: c.image || '',
+            isVisible: c.is_visible !== false
+          }));
+          setCategories(mappedCategories);
         }
       } catch (e) {
         console.error("Error fetching from Supabase:", e);
@@ -274,6 +330,24 @@ export default function App() {
     };
     
     fetchSupabaseData();
+
+    // 4. Realtime subscription to reflect changes immediately across all devices
+    const channel = supabase
+      .channel('schema-tejidos-changes')
+      .on('postgres_changes', { event: '*', schema: 'tejidos', table: 'products' }, () => {
+        fetchSupabaseData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'tejidos', table: 'store_settings' }, () => {
+        fetchSupabaseData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'tejidos', table: 'categories' }, () => {
+        fetchSupabaseData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
