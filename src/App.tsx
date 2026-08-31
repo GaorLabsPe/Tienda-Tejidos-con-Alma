@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Product, CartItem, CartItemOption, StoreSettings, CategoryItem } from './types';
 import { PRODUCTS, DEFAULT_STORE_SETTINGS, DEFAULT_CATEGORIES } from './data/catalog';
 import { supabase } from './lib/supabase';
+import { fetchStoreDataFromSupabase, syncProductToSupabase, syncSettingsToSupabase } from './lib/supabaseDb';
 import { Header } from './components/Header';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetailModal } from './components/ProductDetailModal';
@@ -145,13 +146,9 @@ export default function App() {
     const updatedProducts = products.map(p => {
       if (p.id === productId) {
         const newVisible = p.isVisible === false ? true : false;
-        
-        // Background sync to supabase
-        if (supabase) {
-          supabase.from('products').update({ is_visible: newVisible }).eq('id', productId).then();
-        }
-
-        return { ...p, isVisible: newVisible };
+        const updated = { ...p, isVisible: newVisible };
+        syncProductToSupabase(updated, 'update');
+        return updated;
       }
       return p;
     });
@@ -160,49 +157,19 @@ export default function App() {
 
   const handleAddProduct = async (newProduct: Product) => {
     setProducts(prev => [newProduct, ...prev]);
-    if (supabase) {
-      await supabase.from('products').insert({
-        id: newProduct.id,
-        name: newProduct.name,
-        category: newProduct.category,
-        category_label: newProduct.categoryLabel,
-        price: newProduct.price,
-        original_price: newProduct.originalPrice || null,
-        description: newProduct.description,
-        includes: newProduct.includes,
-        image: newProduct.image,
-        badge: newProduct.badge || null,
-        rating: newProduct.rating || 5.0,
-        review_count: newProduct.reviewCount || 10,
-        preparation_time: newProduct.preparationTime || '24 a 48 hrs',
-        is_visible: newProduct.isVisible !== false,
-      });
-    }
+    await syncProductToSupabase(newProduct, 'insert');
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
     setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-    if (supabase) {
-      await supabase.from('products').update({
-        name: updatedProduct.name,
-        category: updatedProduct.category,
-        category_label: updatedProduct.categoryLabel,
-        price: updatedProduct.price,
-        original_price: updatedProduct.originalPrice || null,
-        description: updatedProduct.description,
-        includes: updatedProduct.includes,
-        image: updatedProduct.image,
-        badge: updatedProduct.badge || null,
-        is_visible: updatedProduct.isVisible !== false,
-        preparation_time: updatedProduct.preparationTime,
-      }).eq('id', updatedProduct.id);
-    }
+    await syncProductToSupabase(updatedProduct, 'update');
   };
 
   const handleDeleteProduct = async (productId: string) => {
+    const prodToDelete = products.find(p => p.id === productId);
     setProducts(prev => prev.filter(p => p.id !== productId));
-    if (supabase) {
-      await supabase.from('products').delete().eq('id', productId);
+    if (prodToDelete) {
+      await syncProductToSupabase(prodToDelete, 'delete');
     }
   };
 
@@ -213,135 +180,45 @@ export default function App() {
 
   const handleSaveSettings = async (newSettings: StoreSettings) => {
     setSettings(newSettings);
-    if (supabase) {
-      const { data } = await supabase.from('store_settings').select('id').limit(1).maybeSingle();
-      const payload = {
-        store_name: newSettings.storeName,
-        whatsapp_number: newSettings.whatsappNumber,
-        whatsapp_display: newSettings.whatsappDisplay,
-        currency: newSettings.currency,
-        currency_symbol: newSettings.currencySymbol,
-        yape_number: newSettings.yapeNumber,
-        plin_number: newSettings.plinNumber,
-        delivery_cost: newSettings.deliveryCost,
-        free_delivery_threshold: newSettings.freeDeliveryThreshold,
-        store_address: newSettings.storeAddress,
-        opening_hours: newSettings.openingHours,
-        tiktok_url: newSettings.tiktokUrl,
-        show_tiktok: newSettings.showTiktok,
-        instagram_url: newSettings.instagramUrl,
-        show_instagram: newSettings.showInstagram,
-        facebook_url: newSettings.facebookUrl,
-        show_facebook: newSettings.showFacebook,
-        admin_pin: newSettings.adminPin,
-      };
-
-      if (data?.id) {
-        await supabase.from('store_settings').update(payload).eq('id', data.id);
-      } else {
-        await supabase.from('store_settings').insert([payload]);
-      }
-    }
+    await syncSettingsToSupabase(newSettings);
   };
 
   useEffect(() => {
     if (!supabase) return;
     
-    const fetchSupabaseData = async () => {
+    const loadData = async () => {
       try {
-        // 1. Fetch Store Settings
-        const { data: storeSettings, error: settingsError } = await supabase
-          .from('store_settings')
-          .select('*')
-          .limit(1)
-          .maybeSingle();
-          
-        if (storeSettings && !settingsError) {
-          setSettings(prev => ({
-            ...prev,
-            storeName: storeSettings.store_name || prev.storeName,
-            whatsappNumber: storeSettings.whatsapp_number || prev.whatsappNumber,
-            whatsappDisplay: storeSettings.whatsapp_display || prev.whatsappDisplay,
-            currency: storeSettings.currency || prev.currency,
-            currencySymbol: storeSettings.currency_symbol || prev.currencySymbol,
-            yapeNumber: storeSettings.yape_number || prev.yapeNumber,
-            plinNumber: storeSettings.plin_number || prev.plinNumber,
-            deliveryCost: storeSettings.delivery_cost ?? prev.deliveryCost,
-            freeDeliveryThreshold: storeSettings.free_delivery_threshold ?? prev.freeDeliveryThreshold,
-            storeAddress: storeSettings.store_address || prev.storeAddress,
-            openingHours: storeSettings.opening_hours || prev.openingHours,
-            tiktokUrl: storeSettings.tiktok_url ?? prev.tiktokUrl,
-            showTiktok: storeSettings.show_tiktok ?? prev.showTiktok,
-            instagramUrl: storeSettings.instagram_url ?? prev.instagramUrl,
-            showInstagram: storeSettings.show_instagram ?? prev.showInstagram,
-            facebookUrl: storeSettings.facebook_url ?? prev.facebookUrl,
-            showFacebook: storeSettings.show_facebook ?? prev.showFacebook,
-            adminPin: storeSettings.admin_pin || prev.adminPin,
-          }));
+        const res = await fetchStoreDataFromSupabase();
+        if (res.products && res.products.length > 0) {
+          setProducts(res.products);
+          localStorage.setItem('tejidos_con_alma_products', JSON.stringify(res.products));
         }
-
-        // 2. Fetch Products
-        const { data: productsData, error: productsError } = await supabase
-          .from('products')
-          .select('*')
-          .order('created_at', { ascending: false });
-          
-        if (productsData && !productsError && productsData.length > 0) {
-          const mappedProducts = productsData.map(p => ({
-            id: p.id,
-            name: p.name,
-            category: p.category,
-            categoryLabel: p.category_label,
-            price: Number(p.price),
-            originalPrice: p.original_price ? Number(p.original_price) : undefined,
-            description: p.description,
-            includes: Array.isArray(p.includes) ? p.includes : [],
-            image: p.image,
-            badge: p.badge,
-            rating: Number(p.rating || 5.0),
-            reviewCount: Number(p.review_count || 10),
-            preparationTime: p.preparation_time,
-            isVisible: p.is_visible !== false
-          })) as Product[];
-          
-          setProducts(mappedProducts);
+        if (res.settings) {
+          setSettings(res.settings);
+          localStorage.setItem('tejidos_con_alma_v1', JSON.stringify(res.settings));
         }
-
-        // 3. Fetch Categories
-        const { data: categoriesData, error: catError } = await supabase
-          .from('categories')
-          .select('*')
-          .order('id');
-
-        if (categoriesData && !catError && categoriesData.length > 0) {
-          const mappedCategories = categoriesData.map(c => ({
-            id: c.id,
-            name: c.name,
-            emoji: c.emoji || '🌸',
-            subtitle: c.subtitle || '',
-            image: c.image || '',
-            isVisible: c.is_visible !== false
-          }));
-          setCategories(mappedCategories);
+        if (res.categories && res.categories.length > 0) {
+          setCategories(res.categories);
+          localStorage.setItem('tejidos_con_alma_categories', JSON.stringify(res.categories));
         }
       } catch (e) {
-        console.error("Error fetching from Supabase:", e);
+        console.error("Error loading store data from Supabase:", e);
       }
     };
     
-    fetchSupabaseData();
+    loadData();
 
-    // 4. Realtime subscription to reflect changes immediately across all devices
+    // Realtime subscription across schemas
     const channel = supabase
-      .channel('schema-tejidos-changes')
-      .on('postgres_changes', { event: '*', schema: 'tejidos', table: 'products' }, () => {
-        fetchSupabaseData();
+      .channel('store-realtime-sync')
+      .on('postgres_changes', { event: '*', schema: '*', table: 'products' }, () => {
+        loadData();
       })
-      .on('postgres_changes', { event: '*', schema: 'tejidos', table: 'store_settings' }, () => {
-        fetchSupabaseData();
+      .on('postgres_changes', { event: '*', schema: '*', table: 'store_settings' }, () => {
+        loadData();
       })
-      .on('postgres_changes', { event: '*', schema: 'tejidos', table: 'categories' }, () => {
-        fetchSupabaseData();
+      .on('postgres_changes', { event: '*', schema: '*', table: 'categories' }, () => {
+        loadData();
       })
       .subscribe();
 

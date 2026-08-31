@@ -19,8 +19,11 @@ export interface SupabaseHealthReport {
   errorMessage?: string;
 }
 
-let detectedSchema: 'tejidos' | 'public' | null = null;
+let activeSchemaCache: 'tejidos' | 'public' | null = null;
 
+/**
+ * Run a query trying both 'tejidos' schema and standard default ('public') schema
+ */
 async function queryWithFallback<T = any>(
   operation: (client: any) => Promise<{ data: T | null; error: any }>
 ): Promise<{ data: T | null; error: any; usedSchema: 'tejidos' | 'public' | null }> {
@@ -28,32 +31,33 @@ async function queryWithFallback<T = any>(
     return { data: null, error: new Error('Supabase no inicializado'), usedSchema: null };
   }
 
-  if (detectedSchema) {
+  // 1. If we already know the working schema, try it first
+  if (activeSchemaCache) {
     try {
-      const client = supabase.schema(detectedSchema);
+      const client = activeSchemaCache === 'tejidos' ? supabase.schema('tejidos') : supabase;
       const res = await operation(client);
-      if (!res.error) {
-        return { data: res.data, error: null, usedSchema: detectedSchema };
+      if (!res.error && res.data !== null) {
+        return { data: res.data, error: null, usedSchema: activeSchemaCache };
       }
     } catch {}
   }
 
-  // Probar esquema 'tejidos'
+  // 2. Try schema 'tejidos'
   try {
     const clientTejidos = supabase.schema('tejidos');
     const resTejidos = await operation(clientTejidos);
     if (!resTejidos.error) {
-      detectedSchema = 'tejidos';
+      activeSchemaCache = 'tejidos';
       return { data: resTejidos.data, error: null, usedSchema: 'tejidos' };
     }
   } catch {}
 
-  // Probar esquema 'public'
+  // 3. Try default / public schema
   try {
-    const clientPublic = supabase.schema('public');
+    const clientPublic = supabase;
     const resPublic = await operation(clientPublic);
     if (!resPublic.error) {
-      detectedSchema = 'public';
+      activeSchemaCache = 'public';
       return { data: resPublic.data, error: null, usedSchema: 'public' };
     }
     return { data: null, error: resPublic.error, usedSchema: 'public' };
@@ -62,6 +66,9 @@ async function queryWithFallback<T = any>(
   }
 }
 
+/**
+ * Diagnostic health check
+ */
 export async function checkSupabaseHealth(): Promise<SupabaseHealthReport> {
   const report: SupabaseHealthReport = {
     connected: false,
@@ -85,7 +92,7 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthReport> {
   }
 
   try {
-    // 1. Productos
+    // 1. Products
     const prodRes = await queryWithFallback((c) => c.from('products').select('id'));
     if (!prodRes.error) {
       report.connected = true;
@@ -107,7 +114,7 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthReport> {
       report.tables.store_settings.error = settingsRes.error.message || String(settingsRes.error);
     }
 
-    // 3. Categorías
+    // 3. Categories
     const catRes = await queryWithFallback((c) => c.from('categories').select('id'));
     if (!catRes.error) {
       report.tables.categories.exists = true;
@@ -116,7 +123,7 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthReport> {
       report.tables.categories.error = catRes.error.message || String(catRes.error);
     }
 
-    // 4. Pedidos
+    // 4. Orders
     const ordersRes = await queryWithFallback((c) => c.from('orders').select('id'));
     if (!ordersRes.error) {
       report.tables.orders.exists = true;
@@ -157,12 +164,15 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthReport> {
   }
 }
 
+/**
+ * Fetch all store data from Supabase
+ */
 export async function fetchStoreDataFromSupabase() {
   const result = {
     products: null as Product[] | null,
     settings: null as StoreSettings | null,
     categories: null as CategoryItem[] | null,
-    activeSchema: detectedSchema,
+    activeSchema: activeSchemaCache,
   };
 
   if (!supabase) return result;
@@ -175,13 +185,13 @@ export async function fetchStoreDataFromSupabase() {
 
     if (storeSettings && !sErr) {
       result.settings = {
-        storeName: storeSettings.store_name || 'Tejidos & Ramos Eternos',
-        whatsappNumber: storeSettings.whatsapp_number || '51987654321',
-        whatsappDisplay: storeSettings.whatsapp_display || '+51 987 654 321',
+        storeName: storeSettings.store_name || storeSettings.storeName || 'Tejidos & Ramos Eternos',
+        whatsappNumber: storeSettings.whatsapp_number || storeSettings.whatsappNumber || '51987654321',
+        whatsappDisplay: storeSettings.whatsapp_display || storeSettings.whatsappDisplay || '+51 987 654 321',
         currency: storeSettings.currency || 'PEN',
-        currencySymbol: storeSettings.currency_symbol || 'S/',
-        yapeNumber: storeSettings.yapeNumber || storeSettings.yape_number || '987654321',
-        plinNumber: storeSettings.plinNumber || storeSettings.plin_number || '987654321',
+        currencySymbol: storeSettings.currency_symbol || storeSettings.currencySymbol || 'S/',
+        yapeNumber: storeSettings.yape_number || storeSettings.yapeNumber || '987654321',
+        plinNumber: storeSettings.plin_number || storeSettings.plinNumber || '987654321',
         deliveryCost: Number(storeSettings.delivery_cost ?? storeSettings.deliveryCost ?? 10),
         freeDeliveryThreshold: Number(storeSettings.free_delivery_threshold ?? storeSettings.freeDeliveryThreshold ?? 120),
         storeAddress: storeSettings.store_address || storeSettings.storeAddress || 'Av. Las Flores 123, Miraflores',
@@ -196,47 +206,47 @@ export async function fetchStoreDataFromSupabase() {
       };
     }
 
-    // 2. Products
+    // 2. Products (Query without strictly requiring created_at to avoid column mismatch)
     const { data: productsData, error: pErr } = await queryWithFallback(
-      (client) => client.from('products').select('*').order('created_at', { ascending: false })
+      (client) => client.from('products').select('*')
     );
 
     if (productsData && !pErr && productsData.length > 0) {
       result.products = productsData.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        category: p.category,
-        categoryLabel: p.category_label || p.categoryLabel || '',
-        price: Number(p.price),
-        originalPrice: p.original_price ? Number(p.original_price) : undefined,
-        description: p.description || '',
-        includes: Array.isArray(p.includes) ? p.includes : [],
-        image: p.image || '',
-        badge: p.badge || undefined,
+        id: String(p.id),
+        name: String(p.name || 'Ramo'),
+        category: String(p.category || 'girasoles'),
+        categoryLabel: String(p.category_label || p.categoryLabel || 'Ramos'),
+        price: Number(p.price || 0),
+        originalPrice: p.original_price ? Number(p.original_price) : (p.originalPrice ? Number(p.originalPrice) : undefined),
+        description: String(p.description || ''),
+        includes: Array.isArray(p.includes) ? p.includes : (typeof p.includes === 'string' ? JSON.parse(p.includes || '[]') : []),
+        image: String(p.image || ''),
+        badge: p.badge ? String(p.badge) : undefined,
         rating: Number(p.rating || 5.0),
-        reviewCount: Number(p.review_count || 10),
-        preparationTime: p.preparation_time || '24 a 48 hrs',
-        isVisible: p.is_visible !== false,
+        reviewCount: Number(p.review_count || p.reviewCount || 10),
+        preparationTime: String(p.preparation_time || p.preparationTime || '24 a 48 hrs'),
+        isVisible: p.is_visible !== false && p.isVisible !== false,
       }));
     }
 
     // 3. Categories
     const { data: catData, error: cErr } = await queryWithFallback(
-      (client) => client.from('categories').select('*').order('id')
+      (client) => client.from('categories').select('*')
     );
 
     if (catData && !cErr && catData.length > 0) {
       result.categories = catData.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        emoji: c.emoji || c.icon || '🌸',
-        subtitle: c.subtitle || c.description || '',
-        image: c.image || '',
-        isVisible: c.is_visible !== false,
+        id: String(c.id),
+        name: String(c.name),
+        emoji: String(c.emoji || c.icon || '🌸'),
+        subtitle: String(c.subtitle || c.description || ''),
+        image: String(c.image || ''),
+        isVisible: c.is_visible !== false && c.isVisible !== false,
       }));
     }
 
-    result.activeSchema = detectedSchema;
+    result.activeSchema = activeSchemaCache;
   } catch (err) {
     console.error('Error fetching data from Supabase:', err);
   }
@@ -244,21 +254,13 @@ export async function fetchStoreDataFromSupabase() {
   return result;
 }
 
+/**
+ * Universal upsert/delete for a product that writes to both 'tejidos' and 'public'
+ */
 export async function syncProductToSupabase(product: Product, action: 'insert' | 'update' | 'delete') {
   if (!supabase) return { success: false, error: 'No client' };
 
   try {
-    const targetSchema = detectedSchema || 'tejidos';
-    const client = supabase.schema(targetSchema);
-
-    if (action === 'delete') {
-      const { error } = await client.from('products').delete().eq('id', product.id);
-      if (error) {
-        await supabase.schema('public').from('products').delete().eq('id', product.id);
-      }
-      return { success: true };
-    }
-
     const payload = {
       id: product.id,
       name: product.name,
@@ -276,32 +278,49 @@ export async function syncProductToSupabase(product: Product, action: 'insert' |
       is_visible: product.isVisible !== false,
     };
 
-    if (action === 'insert') {
-      const { error } = await client.from('products').upsert(payload);
-      if (error) {
-        await supabase.schema('public').from('products').upsert(payload);
-      }
-    } else {
-      const { error } = await client.from('products').update(payload).eq('id', product.id);
-      if (error) {
-        await supabase.schema('public').from('products').update(payload).eq('id', product.id);
-      }
+    if (action === 'delete') {
+      try {
+        await supabase.schema('tejidos').from('products').delete().eq('id', product.id);
+      } catch {}
+      try {
+        await supabase.from('products').delete().eq('id', product.id);
+      } catch {}
+      return { success: true };
     }
 
-    return { success: true };
+    // Try schema 'tejidos' first
+    let saved = false;
+    try {
+      const { error: errTejidos } = await supabase.schema('tejidos').from('products').upsert(payload, { onConflict: 'id' });
+      if (!errTejidos) {
+        saved = true;
+        activeSchemaCache = 'tejidos';
+      }
+    } catch {}
+
+    // Also try/fallback to default 'public' schema
+    try {
+      const { error: errPublic } = await supabase.from('products').upsert(payload, { onConflict: 'id' });
+      if (!errPublic) {
+        saved = true;
+        if (!activeSchemaCache) activeSchemaCache = 'public';
+      }
+    } catch {}
+
+    return { success: saved };
   } catch (err: any) {
-    console.error('Error syncing product:', err);
+    console.error('Error in syncProductToSupabase:', err);
     return { success: false, error: err.message };
   }
 }
 
+/**
+ * Universal sync for Store Settings
+ */
 export async function syncSettingsToSupabase(settings: StoreSettings) {
   if (!supabase) return { success: false };
 
   try {
-    const targetSchema = detectedSchema || 'tejidos';
-    const client = supabase.schema(targetSchema);
-
     const payload = {
       store_name: settings.storeName,
       whatsapp_number: settings.whatsappNumber,
@@ -323,12 +342,26 @@ export async function syncSettingsToSupabase(settings: StoreSettings) {
       admin_pin: settings.adminPin,
     };
 
-    const { data } = await client.from('store_settings').select('id').limit(1).maybeSingle();
-    if (data?.id) {
-      await client.from('store_settings').update(payload).eq('id', data.id);
-    } else {
-      await client.from('store_settings').insert([payload]);
-    }
+    // Try 'tejidos' schema
+    try {
+      const { data: existTejidos } = await supabase.schema('tejidos').from('store_settings').select('id').limit(1).maybeSingle();
+      if (existTejidos?.id) {
+        await supabase.schema('tejidos').from('store_settings').update(payload).eq('id', existTejidos.id);
+      } else {
+        await supabase.schema('tejidos').from('store_settings').insert([payload]);
+      }
+    } catch {}
+
+    // Try default schema
+    try {
+      const { data: existPublic } = await supabase.from('store_settings').select('id').limit(1).maybeSingle();
+      if (existPublic?.id) {
+        await supabase.from('store_settings').update(payload).eq('id', existPublic.id);
+      } else {
+        await supabase.from('store_settings').insert([payload]);
+      }
+    } catch {}
+
     return { success: true };
   } catch (err) {
     console.error('Error saving settings to Supabase:', err);
@@ -336,6 +369,9 @@ export async function syncSettingsToSupabase(settings: StoreSettings) {
   }
 }
 
+/**
+ * Push full current catalog to Supabase
+ */
 export async function pushFullCatalogToSupabase(
   products: Product[],
   categories: CategoryItem[],
@@ -344,48 +380,35 @@ export async function pushFullCatalogToSupabase(
   if (!supabase) return { success: false, message: 'Supabase no está configurado.' };
 
   try {
-    const health = await checkSupabaseHealth();
-    const targetSchema = health.activeSchema || 'tejidos';
-    const client = supabase.schema(targetSchema);
-
     // 1. Settings
     await syncSettingsToSupabase(settings);
 
     // 2. Categories
     for (const cat of categories) {
-      await client.from('categories').upsert({
+      const catPayload = {
         id: cat.id,
         name: cat.name,
         emoji: cat.emoji || '🌸',
         subtitle: cat.subtitle || null,
         image: cat.image || null,
         is_visible: cat.isVisible !== false,
-      });
+      };
+      try {
+        await supabase.schema('tejidos').from('categories').upsert(catPayload, { onConflict: 'id' });
+      } catch {}
+      try {
+        await supabase.from('categories').upsert(catPayload, { onConflict: 'id' });
+      } catch {}
     }
 
     // 3. Products
     for (const prod of products) {
-      await client.from('products').upsert({
-        id: prod.id,
-        name: prod.name,
-        category: prod.category,
-        category_label: prod.categoryLabel,
-        price: prod.price,
-        original_price: prod.originalPrice || null,
-        description: prod.description,
-        includes: prod.includes,
-        image: prod.image,
-        badge: prod.badge || null,
-        rating: prod.rating || 5.0,
-        review_count: prod.reviewCount || 10,
-        preparation_time: prod.preparationTime || '24 a 48 hrs',
-        is_visible: prod.isVisible !== false,
-      });
+      await syncProductToSupabase(prod, 'update');
     }
 
     return { 
       success: true, 
-      message: `¡Se sincronizaron ${products.length} productos, ${categories.length} categorías y la configuración en Supabase (${targetSchema})!` 
+      message: `¡Se sincronizaron ${products.length} productos, ${categories.length} categorías y la configuración en Supabase!` 
     };
   } catch (err: any) {
     return { success: false, message: err.message || 'Error al subir catálogo.' };
